@@ -1,0 +1,85 @@
+Distribution side
+ #define BLYNK_PRINT Serial
+ #include "EmonLib.h"
+ #include <WiFi.h>
+ #include <WiFiClient.h>
+ #include <BlynkSimpleEsp32.h>
+ EnergyMonitor emon;
+ #define vCalibration 160
+ #define currCalibration 1
+ char auth[] = "XUX_m5m1mOAlfD0jLelsjXmYPpitBDBf";
+ char ssid[] = "MASTER";
+ char pass[] = "20042006";
+ WidgetBridge bridge1(V10);
+ BLYNK_CONNECTED()
+ {
+ bridge1.setAuthToken("MFP3HhJC8Yn8UEJV3N2pe_c9etEzFISx"); 
+ }
+ void setup()
+ {
+
+ Serial.begin(9600);
+ WiFi.begin();
+ Blynk.begin(auth, ssid, pass, IPAddress(192,168,2,184));
+ emon.voltage(35, vCalibration, 1.7); 
+ emon.current(34, currCalibration); 
+ }
+ void loop(){
+ emon.calcVI(20, 2000);
+ delay(100);
+ Blynk.virtualWrite(V0, emon.Irms );
+ bridge1.virtualWrite(V1, emon.apparentPower); 
+ delay(100);
+ Blynk.run();
+ }
+Receiver side
+#define BLYNK_PRINT Serial
+#include "EmonLib.h"
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+EnergyMonitor emon;
+
+#define vCalibration 160
+#define currCalibration 1
+char auth[] = "MFP3HhJC8Yn8UEJV3N2pe_c9etEzFISx"; 
+char ssid[] = "MASTER";
+char pass[] = "20042006";
+unsigned int Meter_A = 0;
+int Relay = 13; 
+WidgetBridge bridge1(V10);
+void setup()
+{
+ Serial.begin(9600);
+ Blynk.begin(auth, ssid, pass, IPAddress(192,168,2,184));
+ pinMode(Relay, OUTPUT);
+ emon.voltage(35, vCalibration, 1.7); 
+ emon.current(34, currCalibration); 
+}
+void loop()
+{
+ emon.calcVI(20, 2000);
+float Amps = emon.Irms;
+ Blynk.virtualWrite(V0, emon.Vrms);
+ Blynk.virtualWrite(V1, Amps);
+ Blynk.virtualWrite(V2, emon.apparentPower);
+ Blynk.run();
+ PD = Meter_A - emon.apparentPower ;
+ if ((PD >= 10) && (PD >= -10)) {
+ theft = 1 ;
+ Blynk.virtualWrite(V3, theft);
+ digitalWrite(Relay, LOW); 
+ delay(300);
+ } else {
+ digitalWrite(Relay, HIGH); 
+ theft = 0 ;
+ Blynk.virtualWrite(V3, theft);
+ delay(300);
+ }
+}
+BLYNK_WRITE(V1) 
+{
+ Meter_A = param.asInt();
+ delay(100);
+}
+
